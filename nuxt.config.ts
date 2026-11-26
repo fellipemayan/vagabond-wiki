@@ -3,6 +3,12 @@ export default defineNuxtConfig({
   modules: ['@pinia/nuxt'],
   app: {
     head: {
+      meta: [
+        {
+          name: 'viewport',
+          content: 'width=device-width, initial-scale=1, viewport-fit=cover',
+        },
+      ],
       title: 'VagaTools — Vagabond RPG Wiki',
       titleTemplate: '%s | VagaTools',
       link: [
