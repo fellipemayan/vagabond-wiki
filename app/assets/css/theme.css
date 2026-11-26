@@ -25,7 +25,7 @@
   --border-strong: oklch(0.72 0.015 75);
 
   --header-height: 3.5rem;
-  --sidebar-width: 12.5rem;
+  --sidebar-width: 16rem;
   --radius-sm: 0.25rem;
   --radius-md: 0.45rem;
 
@@ -128,7 +128,7 @@ h6,
 }
 
 h1 {
-  font-size: 2rem;
+  font-size: 1.5rem;
 }
 
 p, li {
