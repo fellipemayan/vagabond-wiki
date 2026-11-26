@@ -336,11 +336,10 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
     justify-content: center;
   }
 
-  /* .header-actions,
   .header-search > .search-input,
   .header-search > .search-dropdown {
     display: none;
-  } */
+  }
 
   .header-search {
     flex: 0 0 auto;
