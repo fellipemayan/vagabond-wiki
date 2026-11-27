@@ -22,6 +22,7 @@ defineProps<{
 
 .portable-text :deep(p) {
   margin: 0;
+  padding-inline: 0.5rem;
 }
 
 /* .portable-text :deep(p + p) {
@@ -43,6 +44,7 @@ defineProps<{
 
 .portable-text :deep(ul),
 .portable-text :deep(ol) {
+  padding-inline: 0.5rem;
   padding-left: 1.35rem;
   display: flex;
   flex-direction: column;
@@ -51,6 +53,6 @@ defineProps<{
 
 :deep(ul:has(> li > strong:first-child)) {
   list-style: none;
-  padding-left: 0;
+  padding-inline: 0.5rem;
 }
 </style>

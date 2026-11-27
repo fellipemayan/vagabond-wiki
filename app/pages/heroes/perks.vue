@@ -79,7 +79,7 @@ function getPrerequisiteSegments(item: PerkItem): PrerequisiteSegment[] {
       segments.push({
         key: 'stat',
         label,
-        value: `${stat.name.trim()}${operatorAndValue}`,
+        value: `${formatStatSigla(stat.name, currentLocale.value)}${operatorAndValue}`,
         isStatCode: true,
       })
     }
@@ -113,6 +113,7 @@ interface PerkItem {
   timesCanTake?: number
   prerequisites?: PerkPrerequisites
   homebrew?: boolean
+  sourceId?: string
   bookTitle?: IntlStringArray
   bookAcronym?: IntlStringArray
 }
@@ -139,7 +140,7 @@ const currentLocale = computed<'pt' | 'en'>(() =>
 )
 
 const PERKS_QUERY = `
-  *[_type == "perk"] | order(coalesce(sortName, name[language == "pt"][0].value, name[_key == "pt"][0].value, key.current) asc) {
+  *[_type == "perk"] {
     _id,
     "key": coalesce(key.current, slug.current),
     name,
@@ -147,8 +148,9 @@ const PERKS_QUERY = `
     unlimitedTimes,
     timesCanTake,
     homebrew,
-    "bookTitle": source->book.title,
-    "bookAcronym": source->book.acronym,
+    "sourceId": source._ref,
+    "bookTitle": source->title,
+    "bookAcronym": source->acronym,
     prerequisites{
       stat{
         usesSelectedStat,
@@ -183,7 +185,49 @@ const filterStat = ref<string>('')
 const filterStatMin = ref<number>(4)
 const filterSpells = ref<string[]>([])
 const filterTrainings = ref<string[]>([])
+const filterSources = ref<string[]>([])
 const spellFilterSearch = ref('')
+
+function getSourceKey(item: PerkItem): string {
+  return (
+    item.sourceId ||
+    tText(item.bookAcronym, '', 'pt') ||
+    tText(item.bookTitle, '', 'pt') ||
+    ''
+  )
+}
+
+const sourceOptions = computed(() => {
+  const map = new Map<string, { id: string; label: string }>()
+
+  for (const item of perks.value ?? []) {
+    if (!showHomebrew.value && item.homebrew) continue
+
+    const id = getSourceKey(item)
+    if (!id || map.has(id)) continue
+
+    const acronym = tText(item.bookAcronym)
+    const title = tText(item.bookTitle)
+    const label =
+      acronym && title && acronym !== title
+        ? `${acronym} — ${title}`
+        : title || acronym || id
+
+    map.set(id, { id, label })
+  }
+
+  const collatorLocale = currentLocale.value === 'pt' ? 'pt-BR' : 'en'
+  return [...map.values()].sort((a, b) =>
+    a.label.localeCompare(b.label, collatorLocale, { sensitivity: 'base' })
+  )
+})
+
+watch(showHomebrew, (enabled) => {
+  if (!enabled) {
+    const validIds = new Set(sourceOptions.value.map((s) => s.id))
+    filterSources.value = filterSources.value.filter((id) => validIds.has(id))
+  }
+})
 
 function parseStat(prereq?: PerkPrerequisites): {
   name?: string
@@ -200,7 +244,7 @@ function parseStat(prereq?: PerkPrerequisites): {
     ? currentLocale.value === 'pt'
       ? 'Atributo selecionado'
       : 'Selected stat'
-    : formatStatLabel(normalizedName!, currentLocale.value)
+    : formatStatSigla(normalizedName!, currentLocale.value)
 
   const op = stat.operator ?? 'gte'
   let formattedValue = ''
@@ -332,6 +376,11 @@ function formatPrerequisiteLine(item: PerkItem): string {
   return blocks.join(' | ')
 }
 
+function getListMetaLine(perk: PerkItem): string {
+  const prereq = formatPrerequisiteLine(perk)
+  return prereq
+}
+
 const spellOptions = computed(() => {
   const map = new Map<string, { id: string; label: string }>()
   for (const perk of perks.value ?? []) {
@@ -363,6 +412,7 @@ function clearFilters() {
   filterStatMin.value = 4
   filterSpells.value = []
   filterTrainings.value = []
+  filterSources.value = []
   spellFilterSearch.value = ''
 }
 
@@ -371,6 +421,7 @@ const activeFilterCount = computed(() => {
   if (filterStat.value) count += 1
   if (filterSpells.value.length > 0) count += filterSpells.value.length
   if (filterTrainings.value.length > 0) count += filterTrainings.value.length
+  if (filterSources.value.length > 0) count += filterSources.value.length
   return count
 })
 
@@ -381,45 +432,57 @@ const hasActiveFilters = computed(() =>
 const filteredPerks = computed(() => {
   const list = perks.value ?? []
   const term = filterQuery.value.trim().toLowerCase()
+  const collatorLocale = currentLocale.value === 'pt' ? 'pt-BR' : 'en'
 
-  return list.filter((item) => {
-    if (!showHomebrew.value && item.homebrew) return false
+  return list
+    .filter((item) => {
+      if (!showHomebrew.value && item.homebrew) return false
 
-    const parsed = getParsedPrereq(item)
+      if (filterSources.value.length > 0) {
+        const srcKey = getSourceKey(item)
+        if (!filterSources.value.includes(srcKey)) return false
+      }
 
-    if (filterStat.value) {
-      if (parsed.statName !== filterStat.value) return false
-      if ((parsed.statValue ?? 0) < filterStatMin.value) return false
-    }
+      const parsed = getParsedPrereq(item)
 
-    if (filterSpells.value.length > 0) {
-      const matchesAnySpell = filterSpells.value.some((id) => parsed.spellIds.includes(id))
-      if (!matchesAnySpell) return false
-    }
+      if (filterStat.value) {
+        if (parsed.statName !== filterStat.value) return false
+        if ((parsed.statValue ?? 0) < filterStatMin.value) return false
+      }
 
-    if (filterTrainings.value.length > 0) {
-      const matchesAnyTraining = filterTrainings.value.some((tr) =>
-        parsed.trainedKeys.includes(tr)
+      if (filterSpells.value.length > 0) {
+        const matchesAnySpell = filterSpells.value.some((id) => parsed.spellIds.includes(id))
+        if (!matchesAnySpell) return false
+      }
+
+      if (filterTrainings.value.length > 0) {
+        const matchesAnyTraining = filterTrainings.value.some((tr) =>
+          parsed.trainedKeys.includes(tr)
+        )
+        if (!matchesAnyTraining) return false
+      }
+
+      if (!term) return true
+
+      const ptName = tText(item.name, '', 'pt').toLowerCase()
+      const enName = tText(item.name, '', 'en').toLowerCase()
+      const slug = (item.key ?? '').toLowerCase()
+      const prereqLine = formatPrerequisiteLine(item).toLowerCase()
+      const descText = `${tPlain(item.description, '', 'pt')} ${tPlain(item.description, '', 'en')}`.toLowerCase()
+
+      return (
+        ptName.includes(term) ||
+        enName.includes(term) ||
+        slug.includes(term) ||
+        prereqLine.includes(term) ||
+        descText.includes(term)
       )
-      if (!matchesAnyTraining) return false
-    }
-
-    if (!term) return true
-
-    const ptName = tText(item.name, '', 'pt').toLowerCase()
-    const enName = tText(item.name, '', 'en').toLowerCase()
-    const slug = (item.key ?? '').toLowerCase()
-    const prereqLine = formatPrerequisiteLine(item).toLowerCase()
-    const descText = `${tPlain(item.description, '', 'pt')} ${tPlain(item.description, '', 'en')}`.toLowerCase()
-
-    return (
-      ptName.includes(term) ||
-      enName.includes(term) ||
-      slug.includes(term) ||
-      prereqLine.includes(term) ||
-      descText.includes(term)
-    )
-  })
+    })
+    .sort((a, b) => {
+      const nameA = tText(a.name) || a.key || ''
+      const nameB = tText(b.name) || b.key || ''
+      return nameA.localeCompare(nameB, collatorLocale, { sensitivity: 'base' })
+    })
 })
 
 const selectedPerk = computed<PerkItem | null>(() => {
@@ -453,18 +516,11 @@ function selectPerk(item: PerkItem) {
         <h1>
           {{ currentLocale === 'pt' ? 'Talentos' : 'Perks' }}
         </h1>
-        <!-- <p class="page-subtitle">
-          {{
-            currentLocale === 'pt'
-              ? 'Consulte pré-requisitos, habilidades e filtre por atributo, magia ou perícia.'
-              : 'Browse prerequisites, abilities, and filter by stat, spell, or skill.'
-          }}
-        </p> -->
       </div>
     </header>
 
     <WikiFilterBar
-      :title="currentLocale === 'pt' ? 'Filtros avançados' : 'Advanced filters'"
+      :title="currentLocale === 'pt' ? 'Filtros' : 'Filters'"
       :collapsible="true"
       :default-collapsed="true"
       :has-active-filters="hasActiveFilters"
@@ -551,6 +607,26 @@ function selectPerk(item: PerkItem) {
           </div>
         </div>
       </div>
+
+      <div v-if="sourceOptions.length > 0" class="filters-row">
+        <div class="filter-group filter-group-grow">
+          <label class="filter-label">
+            {{ currentLocale === 'pt' ? 'Fonte' : 'Source' }}
+          </label>
+          <div class="chips-wrap">
+            <button
+              v-for="src in sourceOptions"
+              :key="src.id"
+              type="button"
+              class="select-chip"
+              :class="{ 'is-active': filterSources.includes(src.id) }"
+              @click="filterSources = toggleArraySelection(filterSources, src.id)"
+            >
+              {{ src.label }}
+            </button>
+          </div>
+        </div>
+      </div>
     </WikiFilterBar>
 
     <div v-if="pending" class="state-box">
@@ -590,8 +666,8 @@ function selectPerk(item: PerkItem) {
           </button>
         </div>
 
-        <ul 
-          v-if="filteredPerks.length > 0" 
+        <ul
+          v-if="filteredPerks.length > 0"
           class="entity-list"
           :class="{ 'is-collapsed-mobile': isListCollapsedMobile }"
         >
@@ -604,11 +680,10 @@ function selectPerk(item: PerkItem) {
             >
               <div class="row-main">
                 <span class="row-title">{{ tText(perk.name) }}</span>
-                <span v-if="perk.homebrew" class="badge-homebrew">HB</span>
               </div>
               <div class="row-meta">
-                <span :title="formatPrerequisiteLine(perk)">
-                  {{ formatPrerequisiteLine(perk) }}
+                <span :title="getListMetaLine(perk)">
+                  {{ getListMetaLine(perk) }}
                 </span>
               </div>
             </button>
@@ -632,7 +707,7 @@ function selectPerk(item: PerkItem) {
                   :key="seg.key"
                 >
                   <span v-if="idx > 0"> | </span>
-                  <strong>{{seg.label}}: </strong>
+                  <strong>{{ seg.label }}: </strong>
                   <span :style="seg.isStatCode ? { textTransform: 'uppercase' } : undefined">
                     {{ seg.value }}
                   </span>
@@ -641,23 +716,19 @@ function selectPerk(item: PerkItem) {
               <template v-else>–</template>
             </span>
           </div>
-
-          <div class="detail-badges">
-            <span
-              v-if="tText(selectedPerk.bookAcronym) || tText(selectedPerk.bookTitle)"
-              class="meta-pill"
-            >
-              {{ tText(selectedPerk.bookAcronym) || tText(selectedPerk.bookTitle) }}
-            </span>
-
-            <span v-if="selectedPerk.homebrew" class="meta-pill is-accent">
-              Homebrew
-            </span>
-          </div>
         </header>
+
         <section class="detail-section">
           <PortableTextRenderer :blocks="tBlocks(selectedPerk.description)" />
         </section>
+
+        <footer
+          v-if="tText(selectedPerk.bookTitle) || tText(selectedPerk.bookAcronym)"
+          class="detail-source"
+        >
+          <strong>{{ currentLocale === 'pt' ? 'Fonte: ' : 'Source: ' }}</strong>
+          <span>{{ tText(selectedPerk.bookTitle) || tText(selectedPerk.bookAcronym) }}</span>
+        </footer>
       </article>
     </div>
   </div>
@@ -780,34 +851,18 @@ function selectPerk(item: PerkItem) {
   display: flex;
   flex-direction: column;
 }
-.detail-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.meta-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius-sm);
-  background-color: var(--bg-subtle);
-  border: 1px solid var(--border-color);
-  /* font-size: 0.8rem; */
-  color: var(--text-secondary);
-}
-
-.meta-pill.is-accent {
-  background-color: var(--accent-subtle);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  font-weight: 600;
-}
 
 .detail-section {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+}
+
+.detail-source {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 </style>

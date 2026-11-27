@@ -99,7 +99,7 @@ const currentLocale = computed<'pt' | 'en'>(() =>
 )
 
 const ALCHEMICALS_QUERY = `
-  *[_type == "alchemical"] | order(coalesce(sortName, name[language == "pt"][0].value, name[_key == "pt"][0].value, name[0].value) asc) {
+  *[_type == "alchemical"] {
     _id,
     "key": coalesce(key.current, slug.current),
     name,
@@ -108,8 +108,8 @@ const ALCHEMICALS_QUERY = `
     cost,
     slots,
     homebrew,
-    "bookTitle": source->book.title,
-    "bookAcronym": source->book.acronym,
+    "bookTitle": source->title,
+    "bookAcronym": source->acronym,
     details{
       die,
       bonusType,
@@ -153,7 +153,8 @@ function compareTypeKeys(a: string, b: string): number {
 
   return getTypeLabel(a).localeCompare(
     getTypeLabel(b),
-    currentLocale.value === 'pt' ? 'pt-BR' : 'en'
+    currentLocale.value === 'pt' ? 'pt-BR' : 'en',
+    { sensitivity: 'base' }
   )
 }
 
@@ -217,36 +218,43 @@ function formatPrice(rawCost: number | undefined | null): string {
 const filteredAlchemicals = computed<AlchemicalItem[]>(() => {
   const list = alchemicals.value ?? []
   const term = filterQuery.value.trim().toLowerCase()
+  const collatorLocale = currentLocale.value === 'pt' ? 'pt-BR' : 'en'
 
-  return list.filter((item) => {
-    if (!showHomebrew.value && item.homebrew) return false
+  return list
+    .filter((item) => {
+      if (!showHomebrew.value && item.homebrew) return false
 
-    if (selectedTypes.value.length > 0) {
-      if (!item.type || !selectedTypes.value.includes(item.type)) return false
-    }
+      if (selectedTypes.value.length > 0) {
+        if (!item.type || !selectedTypes.value.includes(item.type)) return false
+      }
 
-    const cost = typeof item.cost === 'number' && !Number.isNaN(item.cost) ? item.cost : 0
-    if (priceMin.value !== null && priceMin.value !== undefined && cost < priceMin.value) {
-      return false
-    }
-    if (priceMax.value !== null && priceMax.value !== undefined && cost > priceMax.value) {
-      return false
-    }
+      const cost = typeof item.cost === 'number' && !Number.isNaN(item.cost) ? item.cost : 0
+      if (priceMin.value !== null && priceMin.value !== undefined && cost < priceMin.value) {
+        return false
+      }
+      if (priceMax.value !== null && priceMax.value !== undefined && cost > priceMax.value) {
+        return false
+      }
 
-    if (!term) return true
+      if (!term) return true
 
-    const ptName = tText(item.name, '', 'pt').toLowerCase()
-    const enName = tText(item.name, '', 'en').toLowerCase()
-    const typeLabel = getTypeLabel(item.type).toLowerCase()
-    const descText = `${tPlain(item.description, '', 'pt')} ${tPlain(item.description, '', 'en')}`.toLowerCase()
+      const ptName = tText(item.name, '', 'pt').toLowerCase()
+      const enName = tText(item.name, '', 'en').toLowerCase()
+      const typeLabel = getTypeLabel(item.type).toLowerCase()
+      const descText = `${tPlain(item.description, '', 'pt')} ${tPlain(item.description, '', 'en')}`.toLowerCase()
 
-    return (
-      ptName.includes(term) ||
-      enName.includes(term) ||
-      typeLabel.includes(term) ||
-      descText.includes(term)
-    )
-  })
+      return (
+        ptName.includes(term) ||
+        enName.includes(term) ||
+        typeLabel.includes(term) ||
+        descText.includes(term)
+      )
+    })
+    .sort((a, b) => {
+      const nameA = tText(a.name) || a.key || ''
+      const nameB = tText(b.name) || b.key || ''
+      return nameA.localeCompare(nameB, collatorLocale, { sensitivity: 'base' })
+    })
 })
 
 const selectedItem = computed<AlchemicalItem | null>(() => {
@@ -292,13 +300,6 @@ const hasMechanicDetails = computed(() => {
         <h1>
           {{ currentLocale === 'pt' ? 'Alquímicos' : 'Alchemicals' }}
         </h1>
-        <!-- <p class="page-subtitle">
-          {{
-            currentLocale === 'pt'
-              ? 'Consulte itens alquímicos por categoria, custo, efeitos mecânicos e descrição.'
-              : 'Browse alchemical items by category, cost, mechanical effects, and description.'
-          }}
-        </p> -->
       </div>
     </header>
 
@@ -399,8 +400,8 @@ const hasMechanicDetails = computed(() => {
           </button>
         </div>
 
-        <ul 
-          v-if="filteredAlchemicals.length > 0" 
+        <ul
+          v-if="filteredAlchemicals.length > 0"
           class="entity-list"
           :class="{ 'is-collapsed-mobile': isListCollapsedMobile }"
         >
@@ -482,6 +483,14 @@ const hasMechanicDetails = computed(() => {
         <section class="detail-section">
           <PortableTextRenderer :blocks="tBlocks(selectedItem.description)" />
         </section>
+
+        <footer
+          v-if="tText(selectedItem.bookTitle) || tText(selectedItem.bookAcronym)"
+          class="detail-source"
+        >
+          <strong>{{ currentLocale === 'pt' ? 'Fonte: ' : 'Source: ' }}</strong>
+          <span>{{ tText(selectedItem.bookTitle) || tText(selectedItem.bookAcronym) }}</span>
+        </footer>
       </article>
     </div>
   </div>
@@ -598,5 +607,13 @@ const hasMechanicDetails = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+}
+
+.detail-source {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 </style>

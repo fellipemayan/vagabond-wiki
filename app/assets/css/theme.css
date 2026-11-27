@@ -129,10 +129,7 @@ h6,
 
 h1 {
   font-size: 1.5rem;
-}
-
-p, li {
-  font-size: 0.875rem;
+  line-height: 1;
 }
 
 table,
@@ -156,8 +153,8 @@ table tbody tr:nth-child(even) {
 .entity-list {
   list-style: none;
   margin: 0;
-  padding: 0.3rem;
-  max-height: calc(100vh - var(--header-height) - 7rem);
+  padding: 0.5rem;
+  max-height: calc(100vh - var(--header-height) - 10rem + 3px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -190,7 +187,6 @@ table tbody tr:nth-child(even) {
 
 .row-main {
   display: flex;
-  /* align-items: center; */
   justify-content: space-between;
   gap: 0.5rem;
 }
@@ -204,7 +200,7 @@ table tbody tr:nth-child(even) {
   
   span {
     min-width: 0;
-    line-height: 1.25;
+    line-height: 1.5;
     /* white-space: wrap; */
     overflow: hidden;
     text-overflow: ellipsis;
@@ -213,6 +209,7 @@ table tbody tr:nth-child(even) {
 
 /* páginas */
 .section-heading {
+  margin-top: 2rem;
   font-size: 1.5rem;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -271,6 +268,16 @@ table tbody tr:nth-child(even) {
   flex: 1 0 0;
 }
 
+.badge-homebrew {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.125rem 0.25rem;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-subtle);
+  color: var(--text-secondary);
+}
+
 /* layout */
 .detail-page {
   min-height: 0;
@@ -324,7 +331,7 @@ table tbody tr:nth-child(even) {
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.5rem;
   overflow-y: auto;
 }
 
@@ -362,8 +369,8 @@ table tbody tr:nth-child(even) {
 }
 
 @media (max-width: 860px) {
-  p, li {
-    font-size: 1rem;
+  .page-header {
+    padding: 0.5rem 1rem;
   }
 
   .split-layout {

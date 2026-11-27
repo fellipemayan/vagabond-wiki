@@ -7,6 +7,7 @@ const props = withDefaults(
     hasActiveFilters?: boolean
     activeCount?: number
     resetLabel?: string
+    showHomebrewToggle?: boolean,
   }>(),
   {
     title: 'Filtros',
@@ -15,6 +16,7 @@ const props = withDefaults(
     hasActiveFilters: false,
     activeCount: 0,
     resetLabel: 'Limpar filtros',
+    showHomebrewToggle: true,
   }
 )
 
@@ -23,6 +25,8 @@ const emit = defineEmits<{
 }>()
 
 const isCollapsed = ref(props.collapsible ? props.defaultCollapsed : false)
+const { showHomebrew } = storeToRefs(usePreferencesStore())
+const { locale } = useWikiI18n()
 
 function toggleCollapse() {
   if (!props.collapsible) return
@@ -66,8 +70,17 @@ function toggleCollapse() {
 
     <div v-show="!isCollapsed" class="filter-bar-body">
       <slot />
+      <label v-if="showHomebrewToggle" class="homebrew-toggle">
+        <input
+          type="checkbox"
+          :checked="!showHomebrew"
+          @change="showHomebrew = !($event.target as HTMLInputElement).checked"
+        />
+        <span>{{ locale === 'pt' ? 'Ocultar homebrew' : 'Hide homebrew' }}</span>
+      </label>
     </div>
   </section>
+
 </template>
 
 <style>
@@ -175,5 +188,11 @@ function toggleCollapse() {
   flex-direction: column;
   gap: 0.85rem;
   padding-top: 0.15rem;
+}
+
+.homebrew-toggle {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 </style>

@@ -85,7 +85,7 @@ const currentLocale = computed<'pt' | 'en'>(() =>
 )
 
 const ITEMS_QUERY = `
-  *[_type == "gear" && !("startingPack" in category)] | order(coalesce(sortName, name[language == "pt"][0].value, name[_key == "pt"][0].value, name[0].value) asc) {
+  *[_type == "gear" && !("startingPack" in category)] {
     _id,
     "key": coalesce(key.current, slug.current),
     name,
@@ -95,13 +95,13 @@ const ITEMS_QUERY = `
     bonusSlots,
     capacity,
     homebrew,
-    "bookTitle": source->book.title,
-    "bookAcronym": source->book.acronym
+    "bookTitle": source->title,
+    "bookAcronym": source->acronym
   }
 `
 
 const ALCHEMICALS_QUERY = `
-  *[_type == "alchemical"] | order(coalesce(sortName, name[language == "pt"][0].value, name[_key == "pt"][0].value, name[0].value) asc) {
+  *[_type == "alchemical"] {
     _id,
     "key": coalesce(key.current, slug.current),
     name,
@@ -164,7 +164,8 @@ function compareCategoryKeys(a: string, b: string): number {
 
   return getCategoryLabel(a).localeCompare(
     getCategoryLabel(b),
-    currentLocale.value === 'pt' ? 'pt-BR' : 'en'
+    currentLocale.value === 'pt' ? 'pt-BR' : 'en',
+    { sensitivity: 'base' }
   )
 }
 
@@ -258,6 +259,7 @@ const filteredAlchemicals = computed<GearItem[]>(() => {
 })
 
 const groupedTables = computed(() => {
+  const collatorLocale = currentLocale.value === 'pt' ? 'pt-BR' : 'en'
   const categoriesToRender =
     selectedCategories.value.length > 0
       ? [...selectedCategories.value].sort(compareCategoryKeys)
@@ -266,9 +268,15 @@ const groupedTables = computed(() => {
   return categoriesToRender
     .map((catKey) => {
       const isAlchemicalGroup = catKey === ALCHEMICALS_CATEGORY_KEY
-      const rows = isAlchemicalGroup
-        ? filteredAlchemicals.value
-        : filteredGearItems.value.filter((item) => getItemValidCategories(item).includes(catKey))
+      const rows = (
+        isAlchemicalGroup
+          ? filteredAlchemicals.value
+          : filteredGearItems.value.filter((item) => getItemValidCategories(item).includes(catKey))
+      ).sort((a, b) => {
+        const nameA = tText(a.name) || a.key || ''
+        const nameB = tText(b.name) || b.key || ''
+        return nameA.localeCompare(nameB, collatorLocale, { sensitivity: 'base' })
+      })
 
       return {
         key: catKey,
@@ -362,13 +370,6 @@ function handleRowClick(item: GearItem) {
         <h1>
           {{ currentLocale === 'pt' ? 'Itens' : 'Items' }}
         </h1>
-        <!-- <p class="page-subtitle">
-          {{
-            currentLocale === 'pt'
-              ? 'Consulte equipamentos e itens organizados por categoria, com filtros por categoria e faixa de preço.'
-              : 'Browse gear and items grouped by category, with category pills and price range filters.'
-          }}
-        </p> -->
       </div>
     </header>
 

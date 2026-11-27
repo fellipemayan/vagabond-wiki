@@ -235,7 +235,7 @@ const sections: SectionGroup[] = [
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--accent-primary);
+  color: var(--text-heading);
 }
 
 .cards-grid {
@@ -272,7 +272,7 @@ const sections: SectionGroup[] = [
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-heading);
 }
 
 .card-count {

@@ -37,6 +37,7 @@ interface ClassItem {
   training?: string[]
   features?: ClassFeatureItem[]
   homebrew?: boolean
+  sourceId?: string
   bookTitle?: IntlStringArray
   bookAcronym?: IntlStringArray
 }
@@ -147,7 +148,7 @@ const { showHomebrew } = storeToRefs(preferences)
 const { locale, tText, tBlocks } = useWikiI18n()
 
 const CLASSES_QUERY = `
-  *[_type == "class"] | order(coalesce(sortName, name[language == "pt"][0].value, name[_key == "pt"][0].value, key.current) asc) {
+  *[_type == "class"] {
     _id,
     "key": coalesce(key.current, slug.current),
     name,
@@ -171,8 +172,9 @@ const CLASSES_QUERY = `
       level
     },
     homebrew,
-    "bookTitle": source->book.title,
-    "bookAcronym": source->book.acronym
+    "sourceId": source._ref,
+    "bookTitle": source->title,
+    "bookAcronym": source->acronym
   }
 `
 
@@ -182,21 +184,93 @@ const { data: classes, pending, error } = await useSanityQuery<ClassItem[]>(
 )
 
 const filterQuery = ref('')
+const filterSources = ref<string[]>([])
+
+function getSourceKey(item: ClassItem): string {
+  return (
+    item.sourceId ||
+    tText(item.bookAcronym, '', 'pt') ||
+    tText(item.bookTitle, '', 'pt') ||
+    ''
+  )
+}
+
+const sourceOptions = computed(() => {
+  const map = new Map<string, { id: string; label: string }>()
+
+  for (const item of classes.value ?? []) {
+    if (!showHomebrew.value && item.homebrew) continue
+
+    const id = getSourceKey(item)
+    if (!id || map.has(id)) continue
+
+    const acronym = tText(item.bookAcronym)
+    const title = tText(item.bookTitle)
+    const label =
+      acronym && title && acronym !== title
+        ? `${acronym} — ${title}`
+        : title || acronym || id
+
+    map.set(id, { id, label })
+  }
+
+  const collatorLocale = locale.value === 'pt' ? 'pt-BR' : 'en'
+  return [...map.values()].sort((a, b) =>
+    a.label.localeCompare(b.label, collatorLocale, { sensitivity: 'base' })
+  )
+})
+
+watch(showHomebrew, (enabled) => {
+  if (!enabled) {
+    const validIds = new Set(sourceOptions.value.map((s) => s.id))
+    filterSources.value = filterSources.value.filter((id) => validIds.has(id))
+  }
+})
+
+function toggleSource(id: string) {
+  filterSources.value = filterSources.value.includes(id)
+    ? filterSources.value.filter((item) => item !== id)
+    : [...filterSources.value, id]
+}
+
+function clearFilters() {
+  filterQuery.value = ''
+  filterSources.value = []
+}
+
+const activeFilterCount = computed(() => filterSources.value.length)
+
+const hasActiveFilters = computed(() =>
+  Boolean(filterQuery.value.trim() || activeFilterCount.value > 0)
+)
 
 const filteredClasses = computed(() => {
   const list = classes.value ?? []
   const term = filterQuery.value.trim().toLowerCase()
+  const collatorLocale = locale.value === 'pt' ? 'pt-BR' : 'en'
 
-  return list.filter((item) => {
-    if (!showHomebrew.value && item.homebrew) return false
-    if (!term) return true
+  return list
+    .filter((item) => {
+      if (!showHomebrew.value && item.homebrew) return false
 
-    const ptName = tText(item.name, '', 'pt').toLowerCase()
-    const enName = tText(item.name, '', 'en').toLowerCase()
-    const slug = (item.key ?? '').toLowerCase()
+      if (filterSources.value.length > 0) {
+        const srcKey = getSourceKey(item)
+        if (!filterSources.value.includes(srcKey)) return false
+      }
 
-    return ptName.includes(term) || enName.includes(term) || slug.includes(term)
-  })
+      if (!term) return true
+
+      const ptName = tText(item.name, '', 'pt').toLowerCase()
+      const enName = tText(item.name, '', 'en').toLowerCase()
+      const slug = (item.key ?? '').toLowerCase()
+
+      return ptName.includes(term) || enName.includes(term) || slug.includes(term)
+    })
+    .sort((a, b) => {
+      const nameA = tText(a.name) || a.key || ''
+      const nameB = tText(b.name) || b.key || ''
+      return nameA.localeCompare(nameB, collatorLocale, { sensitivity: 'base' })
+    })
 })
 
 const selectedClass = computed<ClassItem | null>(() => {
@@ -286,15 +360,39 @@ const classStatsList = computed(() => {
         <h1>
           {{ locale === 'pt' ? 'Classes' : 'Classes' }}
         </h1>
-        <!-- <p class="page-subtitle">
-          {{
-            locale === 'pt'
-              ? 'Selecione uma classe para consultar descrição, icônicos, estilo de jogo, atributos e habilidades.'
-              : 'Select a class to view its description, iconics, play style, stats, and features.'
-          }}
-        </p> -->
       </div>
     </header>
+
+    <WikiFilterBar
+      v-if="sourceOptions.length > 0"
+      :title="locale === 'pt' ? 'Filtros' : 'Filters'"
+      :collapsible="true"
+      :default-collapsed="true"
+      :has-active-filters="hasActiveFilters"
+      :active-count="activeFilterCount"
+      :reset-label="locale === 'pt' ? 'Limpar filtros' : 'Clear filters'"
+      @reset="clearFilters"
+    >
+      <div class="filters-row">
+        <div class="filter-group filter-group-grow">
+          <label class="filter-label">
+            {{ locale === 'pt' ? 'Fonte' : 'Source' }}
+          </label>
+          <div class="chips-wrap">
+            <button
+              v-for="src in sourceOptions"
+              :key="src.id"
+              type="button"
+              class="select-chip"
+              :class="{ 'is-active': filterSources.includes(src.id) }"
+              @click="toggleSource(src.id)"
+            >
+              {{ src.label }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </WikiFilterBar>
 
     <div v-if="pending" class="state-box">
       {{ locale === 'pt' ? 'Carregando classes...' : 'Loading classes...' }}
@@ -305,7 +403,7 @@ const classStatsList = computed(() => {
     </div>
 
     <div v-else class="split-layout">
-      <!-- Lista lateral: apenas o nome da classe -->
+      <!-- Lista lateral -->
       <section class="list-pane">
         <div class="list-controls">
           <input
@@ -333,8 +431,8 @@ const classStatsList = computed(() => {
           </button>
         </div>
 
-        <ul 
-          v-if="filteredClasses.length > 0" 
+        <ul
+          v-if="filteredClasses.length > 0"
           class="entity-list"
           :class="{ 'is-collapsed-mobile': isListCollapsedMobile }"
         >
@@ -345,9 +443,8 @@ const classStatsList = computed(() => {
               :class="{ 'is-selected': selectedClass?._id === cls._id }"
               @click="selectClass(cls)"
             >
-            <div class="row-main">
+              <div class="row-main">
                 <span class="row-title">{{ tText(cls.name) }}</span>
-                <span v-if="cls.homebrew" class="badge-homebrew">HB</span>
               </div>
             </button>
           </li>
@@ -364,19 +461,6 @@ const classStatsList = computed(() => {
         <header class="detail-header">
           <div class="detail-title-row">
             <h2 class="detail-title">{{ tText(selectedClass.name) }}</h2>
-
-            <div class="detail-badges">
-              <span
-                v-if="tText(selectedClass.bookAcronym) || tText(selectedClass.bookTitle)"
-                class="meta-pill"
-              >
-                {{ tText(selectedClass.bookAcronym) || tText(selectedClass.bookTitle) }}
-              </span>
-
-              <span v-if="selectedClass.homebrew" class="meta-pill is-accent">
-                Homebrew
-              </span>
-            </div>
           </div>
         </header>
 
@@ -398,9 +482,9 @@ const classStatsList = computed(() => {
           v-if="selectedClass.iconics && selectedClass.iconics.length > 0"
           class="detail-section"
         >
-        <h3 class="section-heading">
-          {{ getIconicsHeading(tText(selectedClass.name), locale) }}
-        </h3>
+          <h3 class="section-heading">
+            {{ getIconicsHeading(tText(selectedClass.name), locale) }}
+          </h3>
 
           <ul class="bullet-list">
             <li
@@ -475,12 +559,52 @@ const classStatsList = computed(() => {
             </div>
           </div>
         </section>
+
+        <footer
+          v-if="tText(selectedClass.bookTitle) || tText(selectedClass.bookAcronym)"
+          class="detail-source"
+        >
+          <strong>{{ locale === 'pt' ? 'Fonte: ' : 'Source: ' }}</strong>
+          <span>{{ tText(selectedClass.bookTitle) || tText(selectedClass.bookAcronym) }}</span>
+        </footer>
       </article>
     </div>
   </div>
 </template>
 
 <style scoped>
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 11rem;
+}
+
+.filter-group-grow {
+  flex: 1 1 20rem;
+}
+
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
 .filter-input {
   flex: 1;
   min-width: 0;
@@ -505,30 +629,6 @@ const classStatsList = computed(() => {
   margin: 0;
   font-size: 2rem;
   font-weight: 700;
-}
-
-.detail-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.meta-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius-sm);
-  background-color: var(--bg-subtle);
-  border: 1px solid var(--border-color);
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.meta-pill.is-accent {
-  background-color: var(--accent-subtle);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  font-weight: 600;
 }
 
 .class-quote {
@@ -590,5 +690,13 @@ const classStatsList = computed(() => {
 
 .prop-value.is-stars {
   letter-spacing: 0.1em;
+}
+
+.detail-source {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 </style>

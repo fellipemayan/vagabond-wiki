@@ -370,7 +370,9 @@ function selectSpell(spell: SpellItem) {
                 <span v-if="spell.homebrew" class="badge-homebrew">HB</span>
               </div>
               <div class="row-meta">
-                {{ getBaseDamageLine(spell.damageType) }}
+                <span>
+                  {{ getBaseDamageLine(spell.damageType) }}
+                </span>
               </div>
             </button>
           </li>
@@ -395,25 +397,6 @@ function selectSpell(spell: SpellItem) {
                 <span v-else>–</span>
               </span>
             </div>
-          </div>
-
-          <div class="detail-badges">
-
-            <span v-if="selectedSpell.condition" class="meta-pill">
-              <strong>{{ currentLocale === 'pt' ? 'Condição:' : 'Condition:' }}</strong>
-              {{ tText(selectedSpell.condition.name) }}
-            </span>
-
-            <span
-              v-if="tText(selectedSpell.bookAcronym) || tText(selectedSpell.bookTitle)"
-              class="meta-pill"
-            >
-              {{ tText(selectedSpell.bookAcronym) || tText(selectedSpell.bookTitle) }}
-            </span>
-
-            <span v-if="selectedSpell.homebrew" class="meta-pill is-accent">
-              Homebrew
-            </span>
           </div>
         </header>
 
@@ -574,31 +557,6 @@ function selectSpell(spell: SpellItem) {
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.detail-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.meta-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius-sm);
-  background-color: var(--bg-subtle);
-  border: 1px solid var(--border-color);
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.meta-pill.is-accent {
-  background-color: var(--accent-subtle);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  font-weight: 600;
 }
 
 .detail-section {

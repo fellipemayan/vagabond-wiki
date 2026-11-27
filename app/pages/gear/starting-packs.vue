@@ -219,14 +219,6 @@ function toggleHighlight(pack: StartingPack) {
         <h1>
           {{ currentLocale === 'pt' ? 'Pacotes Iniciais' : 'Starting Packs' }}
         </h1>
-        <p class="intro-paragraph">
-          <template v-if="currentLocale === 'pt'">
-            Você pode escolher qualquer pacote que desejar, mas as Classes oferecem recomendações de Pacotes Iniciais na seção "Jogando" no começo da descrição da classe. Cada pacote gasta os 3 Au iniciais, listando o valor restante. Além dos itens listados, cada Pacote Inicial também inclui uma mochila, um saco de dormir, 5 dias de rações, 2 tochas e um odre. É esperado que você comece o jogo com pelo menos um conjunto de roupas casuais e uma bolsa, que não contam contra o seu dinheiro inicial.
-          </template>
-          <template v-else>
-            You can choose any pack you like, but the Classes list recommended Starting Packs in their "Playing" section at the start of the Class description. Each pack spends the 3g, with remaining Wealth listed. In addition to the Items listed, each Starting Pack also includes a backpack, bedroll, 5 days of rations, 2 torches, and a waterskin. You are assumed to begin the game with at least one set of casual clothes and a pouch, which don't count against your Starting Wealth.
-          </template>
-        </p>
       </div>
     </header>
 
@@ -243,6 +235,15 @@ function toggleHighlight(pack: StartingPack) {
     </div>
 
     <div v-else class="table-wrapper">
+      <p class="intro-paragraph">
+          <template v-if="currentLocale === 'pt'">
+            Você pode escolher qualquer pacote que desejar, mas as Classes oferecem recomendações de Pacotes Iniciais na seção "Jogando" no começo da descrição da classe. Cada pacote gasta os 3 Au iniciais, listando o valor restante. Além dos itens listados, cada Pacote Inicial também inclui uma mochila, um saco de dormir, 5 dias de rações, 2 tochas e um odre. É esperado que você comece o jogo com pelo menos um conjunto de roupas casuais e uma bolsa, que não contam contra o seu dinheiro inicial.
+          </template>
+          <template v-else>
+            You can choose any pack you like, but the Classes list recommended Starting Packs in their "Playing" section at the start of the Class description. Each pack spends the 3g, with remaining Wealth listed. In addition to the Items listed, each Starting Pack also includes a backpack, bedroll, 5 days of rations, 2 torches, and a waterskin. You are assumed to begin the game with at least one set of casual clothes and a pouch, which don't count against your Starting Wealth.
+          </template>
+        </p>
+
       <table class="d66-table">
         <thead>
           <tr>
@@ -342,11 +343,8 @@ function toggleHighlight(pack: StartingPack) {
 </template>
 
 <style scoped>
-.search-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  max-width: 24rem;
+.intro-paragraph {
+  margin: 0 0 1rem 0;
 }
 
 .table-wrapper {
@@ -461,7 +459,7 @@ function toggleHighlight(pack: StartingPack) {
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 0.65rem;
+  gap: 0.25rem 0.25rem;
 }
 
 .pack-item-entry {
@@ -478,7 +476,6 @@ function toggleHighlight(pack: StartingPack) {
 .item-link {
   color: var(--text-heading);
   text-decoration: none;
-  font-weight: 550;
 }
 
 .item-link:hover {
@@ -486,8 +483,6 @@ function toggleHighlight(pack: StartingPack) {
 }
 
 .item-qty {
-  font-size: 0.78rem;
-  font-weight: 700;
   color: var(--text-secondary);
 }
 
@@ -498,7 +493,6 @@ function toggleHighlight(pack: StartingPack) {
 
 .cell-remaining {
   text-align: right;
-  font-weight: 650;
   white-space: nowrap;
 }
 
